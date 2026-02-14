@@ -1,0 +1,157 @@
+Initial observation:
+After fixing the names of the files so the images could be in a different order, I ran the script and still only 3 images stitched
+
+Prompt 1:
+*I pasted the script into chatgpt
+"I ran this code and it only stitched 3 of the images together, what can i change to achieve better results. All the images do have sufficient overlap and they are in order in the same folder"
+
+Response:
+Chatgpt said I should try running scans instead of panorama, I tried this and it created a different set of images but only stitching 2
+
+Observation:
+2 images stitched when running scan but a different 2 than the first time.
+
+Prompt 2:
+"I tried running scans on the same set but it only stitched 2 different pictures together."
+
+Response:
+Stitch in chunks first, then stitch the chunk results (hierarchical)
+This stops Stitcher from “falling in love” with one pair and giving up.
+
+Observation:
+Same result
+
+Prompt 3:
+"i ran this, same results as before, what can i change to change the confidence of the matchmaker"
+
+Response:
+(quick check): Stitcher confidence threshold (may exist)
+
+Add this right after you create the stitcher:
+
+stitcher = cv.Stitcher_create(mode)
+
+# Try lowering the pano confidence threshold (default is often ~1.0)
+if hasattr(stitcher, "setPanoConfidenceThresh"):
+    stitcher.setPanoConfidenceThresh(0.3)   # try 0.3, 0.5, 0.8
+    print("Set pano confidence threshold to 0.3")
+else:
+    print("This OpenCV build doesn't expose setPanoConfidenceThresh()")
+
+
+What it does: it changes how strict Stitcher is about accepting candidate matches/pairs.
+
+If your build doesn’t have it, it’ll print the message and keep going.
+
+Observation:
+"Stitching failed. OpenCV status code: 3"
+
+Prompt:
+I pasted the error
+
+Response:
+Downsize the images
+
+Test:
+I ran another test before making another prompt but I ran it using scans and actually got a decent panorama. There are only 2 photos missing.
+
+Test;
+I ran another test, but I changed the confidence to 0.5 and got a full panorama. I will now try to cut out black space.
+
+Prompt:
+After adjusting confidence level to 0.5 I got a full panorama when using scans mode. What can i change to have the image cropped to clear black space?
+
+Response: 
+Perfect — this just goes after stitching succeeds and before saving.
+
+Right now your code looks like this at the bottom of main():
+
+status, pano = stitcher.stitch(imgs)
+
+if status != cv.Stitcher_OK:
+    print("Stitching failed. OpenCV status code:", status)
+    sys.exit(1)
+
+out_file = "result.jpg"
+cv.imwrite(out_file, pano)
+print("✅ Panorama saved as:", out_file)
+
+Test:
+No top/bottom cropping happened, only left/right
+
+Prompt:
+No top/bottom cropping happened, only left/right
+
+Response:
+That usually happens when your “non-black mask” still has *some* non-black pixels touching the top/bottom (often faint noise or warped seams), so the largest contour’s bounding box spans the full height.
+
+Use a more robust crop: **flood-fill the background from the edges**, then crop to the remaining “content” region.
+
+## Fix: Flood-fill background, then crop to content
+
+1. Add this import at the top (with your other imports):
+
+```python
+import numpy as np
+```
+
+2. Replace your current crop block with this one (same location: after `status == OK` and before `imwrite`):
+
+```python
+# --- Crop black borders (robust: flood-fill background) ---
+gray = cv.cvtColor(pano, cv.COLOR_BGR2GRAY)
+
+# Make a mask of "probably content"
+# Increase 5 -> 10 or 15 if you still get no top/bottom crop
+_, mask = cv.threshold(gray, 10, 255, cv.THRESH_BINARY)
+
+# Clean small specks so they don't prevent cropping
+kernel = cv.getStructuringElement(cv.MORPH_RECT, (9, 9))
+mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
+mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
+
+# Flood-fill from corners to mark background
+h, w = mask.shape[:2]
+ff = mask.copy()
+ff = cv.copyMakeBorder(ff, 1, 1, 1, 1, cv.BORDER_CONSTANT, value=0)  # avoid edge issues
+flood_mask = np.zeros((h + 2 + 2, w + 2 + 2), np.uint8)  # needs to be (H+2, W+2) for floodFill on bordered img
+
+# Flood fill background starting from the four corners
+cv.floodFill(ff, flood_mask, (0, 0), 255)
+cv.floodFill(ff, flood_mask, (w + 1, 0), 255)
+cv.floodFill(ff, flood_mask, (0, h + 1), 255)
+cv.floodFill(ff, flood_mask, (w + 1, h + 1), 255)
+
+# Background is now 255 in ff; content holes are 0. Invert to get content area.
+ff = ff[1:-1, 1:-1]  # remove border
+content = cv.bitwise_not(ff)
+
+# Find bounding rect of content pixels
+ys, xs = np.where(content > 0)
+if len(xs) and len(ys):
+    x0, x1 = xs.min(), xs.max()
+    y0, y1 = ys.min(), ys.max()
+    pano = pano[y0:y1+1, x0:x1+1]
+```
+
+3. Keep your save lines the same:
+
+```python
+out_file = "result.jpg"
+cv.imwrite(out_file, pano)
+print("✅ Panorama saved as:", out_file)
+```
+
+---
+
+### If it still won’t crop top/bottom
+
+Bump the threshold line:
+
+```python
+_, mask = cv.threshold(gray, 20, 255, cv.THRESH_BINARY)
+```
+
+That forces faint dark pixels (near-black) to be treated as background, which usually unlocks top/bottom cropping.
+
+If you want, paste the **image dimensions** of the stitched pano (`print(pano.shape)`) and I’ll suggest the best threshold/kernel values for your output.
