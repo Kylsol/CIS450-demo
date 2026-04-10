@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Caption and Tag Generator</title>
+    <style>
+        :root {
+            --bg: #f5f7fb;
+            --card: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --border: #e5e7eb;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --error-bg: #fef2f2;
+            --error-text: #b91c1c;
+            --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+            --radius: 18px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .page {
+            max-width: 1450px;
+            margin: 0 auto;
+            padding: 32px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .hero {
+            padding: 40px 44px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: 3rem;
+            line-height: 1.05;
+            letter-spacing: -0.04em;
+        }
+
+        .hero p {
+            margin: 0;
+            font-size: 1.08rem;
+            color: var(--muted);
+            max-width: 760px;
+        }
+
+        .upload-section {
+            padding: 24px 44px 30px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .upload-form {
+            display: flex;
+            align-items: end;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .field-group label {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .mode-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .mode-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.98rem;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        input[type="file"],
+        input[type="number"] {
+            font-size: 0.98rem;
+            color: var(--text);
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+
+        input[type="file"] {
+            min-width: 320px;
+        }
+
+        input[type="number"] {
+            width: 140px;
+        }
+
+        button {
+            padding: 14px 24px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .notice {
+            margin-top: 14px;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .error-box {
+            margin: 24px 44px 0;
+            padding: 16px 18px;
+            background: var(--error-bg);
+            border: 1px solid #fecaca;
+            border-radius: 14px;
+            color: var(--error-text);
+        }
+
+        .content {
+            padding: 36px 44px 44px;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.9fr;
+            gap: 28px;
+            align-items: start;
+            margin-bottom: 32px;
+        }
+
+        .left-stack,
+        .right-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .panel,
+        .info-block {
+            background: #fafafa;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+        }
+
+        .section-title {
+            margin: 0 0 14px;
+            font-size: 0.95rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .panel h2,
+        .info-block h3 {
+            margin: 0 0 18px;
+            font-size: 1.9rem;
+            letter-spacing: -0.03em;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 22px;
+        }
+
+        .image-frame {
+            background: #eef2f7;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 14px;
+        }
+
+        .image-frame img {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 14px;
+        }
+
+        .caption-text {
+            margin: 0;
+            font-size: 1.05rem;
+            line-height: 1.7;
+            color: #111827;
+        }
+
+        .tag-list,
+        .legend-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tag-list li,
+        .legend-list li {
+            padding: 10px 14px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #dbeafe;
+            border-radius: 999px;
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .detail-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .detail-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: white;
+            font-size: 0.98rem;
+        }
+
+        .detail-label {
+            font-weight: 700;
+        }
+
+        .detail-score {
+            color: var(--muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .alt-text-box {
+            width: 100%;
+            min-height: 96px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: white;
+            color: var(--text);
+            font-size: 0.95rem;
+            font-family: Menlo, Monaco, Consolas, monospace;
+            line-height: 1.5;
+            resize: vertical;
+        }
+
+        .copy-button {
+            margin-top: 14px;
+            padding: 12px 18px;
+            font-size: 0.95rem;
+        }
+
+        .empty-state {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--muted);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            background: #fafafa;
+        }
+
+        @media (max-width: 1150px) {
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero h1 {
+                font-size: 2.4rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="card">
+            <div class="hero">
+                <h1>AI Image Caption and Tag Generator</h1>
+                <p>Upload an image to generate an AI caption, caption keywords, object detection results, and accessibility-friendly alt text.</p>
+            </div>
+
+            <div class="upload-section">
+                <form method="POST" enctype="multipart/form-data" class="upload-form">
+                    <div class="field-group">
+                        <label>Image</label>
+
+                        <div class="mode-options">
+                            <label class="mode-option">
+                                <input type="radio" name="mode" value="single" checked>
+                                Single Upload
+                            </label>
+
+                            <label class="mode-option">
+                                <input type="radio" name="mode" value="batch">
+                                Batch Upload
+                            </label>
+                        </div>
+
+                        <input type="file" id="image" name="image" accept="image/*" multiple required>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="threshold">Detection Threshold</label>
+                        <input
+                            type="number"
+                            id="threshold"
+                            name="threshold"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value="{{ threshold }}"
+                            required
+                        >
+                    </div>
+
+                    <button type="submit">Generate Results</button>
+                </form>
+
+                <p class="notice">
+                    Captions and detections are AI-generated and may not always be perfectly accurate.
+                    Lower thresholds may show more detections, but with less confidence.
+                </p>
+            </div>
+
+            {% if error %}
+                <div class="error-box">
+                    <strong>Error:</strong> {{ error }}
+                </div>
+            {% endif %}
+
+            <div class="content">
+                {% if results %}
+                    {% for r in results %}
+                        <div class="results-grid">
+                            <div class="left-stack">
+                                <div class="panel">
+                                    <p class="section-title">Image Results</p>
+                                    <h2>Preview and Detection</h2>
+
+                                    <div class="image-grid">
+                                        <div>
+                                            <p class="section-title">Original Image</p>
+                                            <div class="image-frame">
+                                                <img src="{{ url_for('static', filename=r.image_path) }}" alt="Uploaded image" loading="lazy">
+                                            </div>
+                                        </div>
+
+                                        {% if r.boxed_image %}
+                                            <div>
+                                                <p class="section-title">Object Detection Output</p>
+                                                <div class="image-frame">
+                                                    <img src="{{ url_for('static', filename=r.boxed_image) }}" alt="Detected objects image" loading="lazy">
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="right-stack">
+                                {% if r.caption %}
+                                    <div class="info-block">
+                                        <p class="section-title">Caption</p>
+                                        <h3>Generated Description</h3>
+                                        <p class="caption-text">{{ r.caption }}</p>
+                                    </div>
+                                {% endif %}
+
+                                {% if r.alt_text %}
+                                    <div class="info-block">
+                                        <p class="section-title">Accessibility</p>
+                                        <h3>Alt Attribute Value</h3>
+                                        <textarea class="alt-text-box" id="altText{{ loop.index }}" rows="4" readonly>alt="{{ r.alt_text }}"</textarea>
+                                        <button type="button" class="copy-button" onclick="copyAltText('altText{{ loop.index }}')">Copy Alt Attribute</button>
+                                    </div>
+                                {% endif %}
+
+                                {% if r.tags %}
+                                    <div class="info-block">
+                                        <p class="section-title">Keywords</p>
+                                        <h3>Caption Keywords</h3>
+                                        <ul class="tag-list">
+                                            {% for tag in r.tags %}
+                                                <li>{{ tag }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+
+                                {% if r.detected_summary %}
+                                    <div class="info-block">
+                                        <p class="section-title">Legend</p>
+                                        <h3>Detected Label Counts</h3>
+                                        <ul class="legend-list">
+                                            {% for item in r.detected_summary %}
+                                                <li>{{ item.label }} × {{ item.count }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+
+                                {% if r.detection_details %}
+                                    <div class="info-block">
+                                        <p class="section-title">Detection Details</p>
+                                        <h3>Confidence Scores</h3>
+                                        <ul class="detail-list">
+                                            {% for item in r.detection_details %}
+                                                <li>
+                                                    <span class="detail-label">{{ item.label }}</span>
+                                                    <span class="detail-score">{{ item.score }}</span>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <h2 style="margin-top: 0; margin-bottom: 10px;">No image uploaded yet</h2>
+                        <p style="margin: 0;">Upload an image above to see the caption, keyword tags, object detections, and accessibility-friendly alt text here.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyAltText(elementId) {
+            const text = document.getElementById(elementId).value;
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Alt attribute copied!");
+            }).catch(() => {
+                alert("Failed to copy alt attribute.");
+            });
+        }
+    </script>
+</body>
+</html>

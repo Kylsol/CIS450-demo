@@ -206,3 +206,6 @@ In essence, add_line() takes a raw Line2D object and fully integrates it into th
 # Analysis
 
 add_line() takes a Line2D object and “attaches it” to the Axes so Matplotlib can draw it. It checks that the input is a real line, applies the Axes settings, clips it to the plot area, updates the Axes limits to include the line’s data, and then adds it to the Axes’ list of drawable objects. Finally, it marks the Axes as needing a redraw so the line will appear when the figure is rendered.
+
+****************************************************************
+
