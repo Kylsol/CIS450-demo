@@ -1,11 +1,34 @@
 # AI Alt Text Generator
 
 ## Description
-This project is a web-based AI tool that generates captions and alt text for uploaded images. The goal is to improve accessibility by helping users quickly create meaningful alt text without having to write it manually.
+This project is a web-based AI tool that generates captions, tags, and accessibility-friendly alt text for uploaded images. The goal is to improve accessibility by helping users quickly create meaningful alt text without having to write it manually.
 
-The application allows users to upload one or more images and uses pretrained AI models to analyze the content. It then generates a caption, identifies objects in the image, and combines that information into structured alt text.
+The application allows users to upload one or more images and uses pretrained AI models to analyze the content. It generates a caption, detects objects within the image, and combines that information into structured, readable alt text.
 
-This project was built using Python, Flask, and Hugging Face Transformers.
+This project was built using Python, Flask, and Hugging Face Transformers, along with computer vision models for captioning and object detection.
+
+---
+
+## Features
+- Upload single or multiple images  
+- AI-generated image captions  
+- Object detection with bounding boxes  
+- Keyword/tag generation from captions  
+- Automatically generated accessibility-friendly alt text  
+- Adjustable detection threshold for object filtering  
+
+---
+
+## Tech Stack
+- **Backend:** Python, Flask  
+- **AI Models:**  
+  - BLIP (Salesforce) for image captioning  
+  - DETR (Facebook) for object detection  
+- **Libraries:**  
+  - Hugging Face Transformers  
+  - Pillow (PIL)  
+  - Matplotlib  
+  - PyTorch  
 
 ---
 
@@ -27,7 +50,8 @@ I relied mostly on official documentation and a few key resources while building
 
 - Flask Documentation: https://flask.palletsprojects.com/  
 - Hugging Face Transformers: https://huggingface.co/docs/transformers  
-- Pillow (PIL): https://python-pillow.org/ 
+- PyTorch: https://pytorch.org/  
+- Pillow (PIL): https://python-pillow.org/  
 
 These helped me understand how to handle file uploads, process images, and integrate AI models into a working web app.
 
@@ -37,32 +61,42 @@ These helped me understand how to handle file uploads, process images, and integ
 
 I used ChatGPT throughout this project mainly as a guide to help me understand problems and find the right direction, rather than just giving me final answers. Most of the time, I used it to figure out what I should be looking up or which tools and concepts were relevant.
 
-For example, when I ran into issues, I would describe the problem to ChatGPT and ask questions like:
-- “Why is my Flask form not working when I submit it?”
-- “How do I handle multiple file uploads in Flask?”
-- “What’s the best way to generate captions from images using AI?”
+For example, when I ran into issues, I would describe the problem and ask questions like:
+- “Why is my Flask form not working when I submit it?”  
+- “How do I handle multiple file uploads in Flask?”  
+- “What’s the best way to generate captions from images using AI?”  
 
-Based on those prompts, ChatGPT would suggest possible solutions or point me toward specific libraries or approaches. I would then use that information to look at official documentation (like Flask or Hugging Face) and implement the solution myself.
+Based on those prompts, I was guided toward possible solutions or relevant tools. I would then verify and implement those solutions using official documentation.
 
-I also used ChatGPT to:
-- Help debug issues when the app wasn’t behaving as expected  
-- Clean up parts of my code when it became messy  
-- Understand error messages and what they meant
+I also used AI to:
+- Debug errors (especially with Transformers and model loading)  
+- Understand pipeline differences and model requirements  
+- Refactor messy code into cleaner structure  
+- Improve how alt text is generated from raw model output  
 
-Some example prompts I used include:
-- “Help me build a Flask app that uploads images and uses Hugging Face for captions, what are some libraries I could use and what are the benefits and downsides to each”
-- “After I press generate, nothing, the app clears the uploads and resets without any errors, where would the first place to troubleshoot be”
-- “How do I loop through multiple uploaded images in Flask?”
-- “How can I make this alt text more useful for accessibility?”
+Some example prompts I used include: 
+- “My pipeline is throwing an unknown task error, what could be causing this?”  
+- “Why does this model require text input?”  
+- “How can I make this alt text more useful for accessibility?”  
 
-ChatGPT made development faster and helped me stay unstuck, but it wasn’t just copy and paste. I still had to test everything, fix errors, and make adjustments to fit my project. In most cases, I used it to understand the problem first, and then used documentation to confirm and apply the solution.
+ChatGPT made development faster and helped me stay unstuck, but it wasn’t just copy and paste. I still had to test everything, fix errors, and adapt solutions to fit my project.
 
 ---
 
-### Development Reflection (Early Investigation)
+### Development Reflection
 
 One thing I realized pretty quickly is that the hard part isn’t getting something to work—it’s getting it to work well. The basic version of this app came together pretty fast, but making it reliable and user-friendly took more time.
 
-Most of the issues I ran into were things like handling file uploads, passing data correctly to the frontend, and cleaning up AI output so it was actually useful. The AI part worked early on, but refining the results into proper alt text took more effort.
+A big challenge was working with AI models and understanding how different pipelines behave. For example, I ran into issues with mismatched pipeline tasks (`image-to-text` vs `image-text-to-text`) and missing dependencies like `timm` for object detection. Fixing these required digging into documentation and understanding how the models actually work rather than just calling them.
 
-This phase helped me build a strong foundation, and I plan to keep improving the UI and overall experience as I continue development.
+Another issue I ran into was moving the project from macOS (where I initially developed it) to Windows. Differences in Python versions, package installations, and command usage (such as `python` vs `python3`) caused unexpected errors. Some libraries also behaved differently or required additional dependencies on Windows. This forced me to better understand my environment setup and how to properly manage dependencies across platforms.
+
+Most of the issues I ran into were things like:
+- Handling file uploads correctly  
+- Passing data between backend and frontend  
+- Debugging model errors and environment issues  
+- Cleaning up AI output so it was actually useful  
+
+The AI part worked early on, but refining the results into proper, readable alt text took more effort.
+
+This project helped me get more comfortable working with APIs, debugging real-world issues, and building something step by step. Going forward, I would like to improve the UI, optimize performance, and possibly expand this into a more polished accessibility tool.

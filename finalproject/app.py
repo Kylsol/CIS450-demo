@@ -17,19 +17,31 @@ UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
-caption_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
+# -----------------------------
+# Lazy-loaded AI models (safer for deployment)
+# -----------------------------
+processor = None
+caption_model = None
+detector = None
 
-detector = pipeline("object-detection", model="facebook/detr-resnet-50")
+def load_models():
+    global processor, caption_model, detector
 
-# captioner = pipeline("image-to-text", model="Salesforce/blip-image-captioning-large")
-# detector = pipeline("object-detection", model="facebook/detr-resnet-50")
-# captioner = pipeline("image-text-to-text", model="Salesforce/blip-image-captioning-large")
+    if processor is None:
+        processor = BlipProcessor.from_pretrained(
+            "Salesforce/blip-image-captioning-large"
+        )
+        caption_model = BlipForConditionalGeneration.from_pretrained(
+            "Salesforce/blip-image-captioning-large"
+        )
+        detector = pipeline(
+            "object-detection",
+            model="facebook/detr-resnet-50"
+        )
 
-# captioner = pipeline("image-feature-extraction", model="Salesforce/blip-image-captioning-large")
-# detector = pipeline("object-detection", model="facebook/detr-resnet-50")
-
-
+# -----------------------------
+# Draw bounding boxes
+# -----------------------------
 def draw_boxes(image_path, detections, output_path):
     image = Image.open(image_path).convert("RGB")
 
@@ -70,7 +82,9 @@ def draw_boxes(image_path, detections, output_path):
     plt.savefig(output_path, bbox_inches="tight", pad_inches=0.1)
     plt.close()
 
-
+# -----------------------------
+# Generate tags from caption
+# -----------------------------
 def generate_tags_from_caption(caption: str) -> list[str]:
     stop_words = {
         "a", "an", "the", "is", "are", "of", "on", "in", "at", "to",
@@ -89,7 +103,9 @@ def generate_tags_from_caption(caption: str) -> list[str]:
 
     return tags[:8]
 
-
+# -----------------------------
+# Generate alt text
+# -----------------------------
 def generate_alt_text(caption: str, detected_summary: list[dict]) -> str:
     if caption:
         alt_text = caption.strip().capitalize()
@@ -111,9 +127,13 @@ def generate_alt_text(caption: str, detected_summary: list[dict]) -> str:
 
     return alt_text
 
-
+# -----------------------------
+# Main route
+# -----------------------------
 @app.route("/", methods=["GET", "POST"])
 def index():
+    load_models()  # ensure models are loaded only when needed
+
     results = []
     error = None
     threshold = 0.5
@@ -139,17 +159,18 @@ def index():
             try:
                 image = Image.open(filepath).convert("RGB")
 
-                # caption_result = captioner(image)
-                # caption = None
-                # if caption_result and isinstance(caption_result, list):
-                #     caption = caption_result[0]["generated_text"]
-
+                # -----------------------------
+                # Caption generation (BLIP)
+                # -----------------------------
                 inputs = processor(images=image, return_tensors="pt")
                 out = caption_model.generate(**inputs, max_new_tokens=50)
                 caption = processor.decode(out[0], skip_special_tokens=True)
 
                 tags = generate_tags_from_caption(caption) if caption else []
 
+                # -----------------------------
+                # Object detection (DETR)
+                # -----------------------------
                 detections = detector(image)
                 filtered_detections = [
                     det for det in detections if det.get("score", 0) >= threshold
@@ -164,7 +185,6 @@ def index():
                     boxed_path = os.path.join(app.config["UPLOAD_FOLDER"], boxed_filename)
                     draw_boxes(filepath, filtered_detections, boxed_path)
 
-                    # store as static-relative paths
                     boxed_image = f"uploads/{boxed_filename}"
 
                     label_counts = Counter(det["label"] for det in filtered_detections)
@@ -207,6 +227,9 @@ def index():
         threshold=threshold
     )
 
-
+# -----------------------------
+# ENTRY POINT (RENDER SAFE)
+# -----------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
