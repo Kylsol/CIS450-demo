@@ -2,7 +2,8 @@ from flask import Flask, render_template, request
 import os
 from collections import Counter
 from PIL import Image
-from transformers import pipeline
+from transformers import pipeline, BlipProcessor, BlipForConditionalGeneration
+import torch
 
 import matplotlib
 matplotlib.use("Agg")
@@ -16,8 +17,17 @@ UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-captioner = pipeline("image-to-text", model="Salesforce/blip-image-captioning-large")
+processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
+caption_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
+
 detector = pipeline("object-detection", model="facebook/detr-resnet-50")
+
+# captioner = pipeline("image-to-text", model="Salesforce/blip-image-captioning-large")
+# detector = pipeline("object-detection", model="facebook/detr-resnet-50")
+# captioner = pipeline("image-text-to-text", model="Salesforce/blip-image-captioning-large")
+
+# captioner = pipeline("image-feature-extraction", model="Salesforce/blip-image-captioning-large")
+# detector = pipeline("object-detection", model="facebook/detr-resnet-50")
 
 
 def draw_boxes(image_path, detections, output_path):
@@ -129,10 +139,14 @@ def index():
             try:
                 image = Image.open(filepath).convert("RGB")
 
-                caption_result = captioner(image)
-                caption = None
-                if caption_result and isinstance(caption_result, list):
-                    caption = caption_result[0]["generated_text"]
+                # caption_result = captioner(image)
+                # caption = None
+                # if caption_result and isinstance(caption_result, list):
+                #     caption = caption_result[0]["generated_text"]
+
+                inputs = processor(images=image, return_tensors="pt")
+                out = caption_model.generate(**inputs, max_new_tokens=50)
+                caption = processor.decode(out[0], skip_special_tokens=True)
 
                 tags = generate_tags_from_caption(caption) if caption else []
 

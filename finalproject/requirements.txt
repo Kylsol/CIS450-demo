@@ -1,6 +1,6 @@
 flask
 pillow
-transformers==4.36.2
+transformers
 torch
 sentencepiece
 matplotlib
