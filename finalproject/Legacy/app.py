@@ -1,20 +1,21 @@
 from flask import Flask, render_template, request
 import os
 from collections import Counter
-from pathlib import Path
 from PIL import Image
 from transformers import pipeline, BlipProcessor, BlipForConditionalGeneration
+import torch
+
 import matplotlib
 matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "static/uploads")
+UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-Path(UPLOAD_FOLDER).mkdir(parents=True, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # -----------------------------
 # Lazy-loaded AI models (safer for deployment)
@@ -23,22 +24,20 @@ processor = None
 caption_model = None
 detector = None
 
-
 def load_models():
     global processor, caption_model, detector
 
     if processor is None:
         processor = BlipProcessor.from_pretrained(
-            "Salesforce/blip-image-captioning-base"
+            "Salesforce/blip-image-captioning-large"
         )
         caption_model = BlipForConditionalGeneration.from_pretrained(
-            "Salesforce/blip-image-captioning-base"
+            "Salesforce/blip-image-captioning-large"
         )
         detector = pipeline(
             "object-detection",
             model="facebook/detr-resnet-50"
         )
-
 
 # -----------------------------
 # Draw bounding boxes
@@ -83,7 +82,6 @@ def draw_boxes(image_path, detections, output_path):
     plt.savefig(output_path, bbox_inches="tight", pad_inches=0.1)
     plt.close()
 
-
 # -----------------------------
 # Generate tags from caption
 # -----------------------------
@@ -104,7 +102,6 @@ def generate_tags_from_caption(caption: str) -> list[str]:
             seen.add(word)
 
     return tags[:8]
-
 
 # -----------------------------
 # Generate alt text
@@ -130,24 +127,18 @@ def generate_alt_text(caption: str, detected_summary: list[dict]) -> str:
 
     return alt_text
 
-
-@app.route("/healthz", methods=["GET"])
-def healthz():
-    return {"status": "ok"}, 200
-
-
 # -----------------------------
 # Main route
 # -----------------------------
 @app.route("/", methods=["GET", "POST"])
 def index():
+    load_models()  # ensure models are loaded only when needed
+
     results = []
     error = None
     threshold = 0.5
 
     if request.method == "POST":
-        load_models()
-
         files = request.files.getlist("image")
         threshold_raw = request.form.get("threshold", "0.5")
 
@@ -162,11 +153,7 @@ def index():
             if not file or not file.filename:
                 continue
 
-            safe_name = secure_filename(file.filename)
-            if not safe_name:
-                continue
-
-            filepath = os.path.join(app.config["UPLOAD_FOLDER"], safe_name)
+            filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
             file.save(filepath)
 
             try:
@@ -194,7 +181,7 @@ def index():
                 detection_details = []
 
                 if filtered_detections:
-                    boxed_filename = f"boxed_{safe_name}"
+                    boxed_filename = f"boxed_{file.filename}"
                     boxed_path = os.path.join(app.config["UPLOAD_FOLDER"], boxed_filename)
                     draw_boxes(filepath, filtered_detections, boxed_path)
 
@@ -221,7 +208,7 @@ def index():
                 alt_text = generate_alt_text(caption, detected_summary)
 
                 results.append({
-                    "image_path": f"uploads/{safe_name}",
+                    "image_path": f"uploads/{file.filename}",
                     "boxed_image": boxed_image,
                     "caption": caption,
                     "tags": tags,
@@ -231,7 +218,7 @@ def index():
                 })
 
             except Exception as e:
-                error = f"Error processing {safe_name}: {str(e)}"
+                error = f"Error processing {file.filename}: {str(e)}"
 
     return render_template(
         "index.html",
@@ -240,9 +227,8 @@ def index():
         threshold=threshold
     )
 
-
 # -----------------------------
-# ENTRY POINT (local dev)
+# ENTRY POINT (RENDER SAFE)
 # -----------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
